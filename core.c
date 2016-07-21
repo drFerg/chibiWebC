@@ -27,8 +27,6 @@ typedef struct request {
 } Request;
 
 #define SERVER_NAME "ChibiCWeb"
-char const *msg = "HTTP/1.1 200 OK\nDate: Mon, 27 Jul 2009 12:28:53 GMT\nServer: CWeb (MacOS)\nLast-Modified: Wed, 22 Jul 2009 19:15:56 GMT\nContent-Length: 0\nContent-Type: text/html\nConnection: Closed";
-
 
 int generateResponse(char *buffer, int buffSize, int response, int length, int contentType) {
   time_t ticks;
@@ -50,6 +48,7 @@ int http_response(int fd, int status, char *text, int len) {
   int hdrLen = generateResponse(header, 1000, status, len, 0);
   int responseLen = hdrLen + len + 1;
   char *response = (char *) malloc(responseLen);
+  if (response == NULL) return -1;
   memcpy(response, header, hdrLen);
   memcpy(response + hdrLen, text, len);
   response[responseLen - 1] = '\0';
@@ -157,7 +156,7 @@ int main(int argc, char const *argv[]) {
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
     serv_addr.sin_port = htons(5000);
-    
+
     // lose the pesky "Address already in use" error message
     if (setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof yes) == -1) {
         perror("setsockopt");
