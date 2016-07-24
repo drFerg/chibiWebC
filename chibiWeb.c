@@ -39,7 +39,7 @@ typedef struct request {
     Param *param;
 } Request;
 
-#define SERVER_NAME "ChibiCWeb"
+#define SERVER_NAME "ChibiWebC"
 
 int generateResponse(char *buffer, int buffSize, int response, int length, int contentType) {
   time_t ticks;
