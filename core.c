@@ -9,8 +9,21 @@
 #include <string.h>
 #include <sys/types.h>
 #include <time.h>
+#include <pthread.h>
 
+#define POOL_SIZE 20
 #define REQUEST_SIZE 1500
+
+typedef struct work {
+  int fd;
+  struct work *next;
+} Work;
+
+typedef struct workQueue {
+  pthread_mutex_t lock;
+  pthread_cond_t cond;
+  Work *work;
+} WorkQueue;
 
 typedef struct param {
   char *key;
@@ -145,8 +158,53 @@ Request *http_parseRequest(int fd) {
   return r;
 }
 
+
+Work *work_get(WorkQueue *wq) {
+  Work *q = NULL;
+  pthread_mutex_lock(&(wq->lock));
+  while (wq->work == NULL) pthread_cond_wait(&(wq->cond), &(wq->lock));
+  q = wq->work;
+  wq->work = wq->work->next;
+  pthread_mutex_unlock(&(wq->lock));
+  return q;
+}
+
+void work_put(WorkQueue *wq, Work *w) {
+  Work *v;
+  pthread_mutex_lock(&(wq->lock));
+  if (wq->work == NULL) wq->work = w;
+  else {
+    for(v = wq->work; v->next != NULL; v = v->next);
+    v->next = w;
+  }
+  pthread_cond_signal(&(wq->cond));
+  pthread_mutex_unlock(&(wq->lock));
+}
+
+void *workerThread(void *workQueue) {
+  WorkQueue * wq = (WorkQueue *) workQueue;
+  Work *w = NULL;
+  Request *r = NULL;
+  while(1) {
+    w = work_get(wq);
+    printf("Thread 0x%x got work\n", (int) pthread_self());
+    r = http_parseRequest(w->fd);
+    request_free(r);
+    http_response(w->fd, 200, "Hello world", 11);
+    close(w->fd);
+    free(w);
+  }
+  pthread_exit(0);
+}
+
 int main(int argc, char const *argv[]) {
-    int listenfd, connfd;
+    pthread_t workerPool[POOL_SIZE];
+    WorkQueue workQueue;
+    pthread_mutex_init(&(workQueue.lock), NULL);
+    pthread_cond_init(&(workQueue.cond), NULL);
+
+
+    int listenfd;
     struct sockaddr_in serv_addr;
     int yes = 1;
 
@@ -166,13 +224,16 @@ int main(int argc, char const *argv[]) {
       perror("bind");
       exit(1);
     }
-    listen(listenfd, 10);
 
+    for (int i = 0; i < POOL_SIZE; i++) {
+      pthread_create(&workerPool[i], NULL, workerThread, (void*) &workQueue);
+    }
+    listen(listenfd, 10);
+    Work *w;
     while(1) {
-        connfd = accept(listenfd, (struct sockaddr*) NULL, NULL);
-        Request *r = http_parseRequest(connfd);
-        request_free(r);
-        http_response(connfd, 200, "Hello world", 11);
-        close(connfd);
+        w = (Work *) malloc(sizeof(Work));
+        w->next = NULL;
+        w->fd = accept(listenfd, (struct sockaddr*) NULL, NULL);
+        work_put(&workQueue, w);
      }
 }
