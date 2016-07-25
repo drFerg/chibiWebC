@@ -11,37 +11,55 @@
 #include <time.h>
 #include <pthread.h>
 
+#include "chibiWeb.h"
 #include "work.h"
 #include "request.h"
 #include "response.h"
 #include "chibiWebDefs.h"
-#define POOL_SIZE 20
+#define POOL_SIZE 4
+
+
+Handler h = NULL;
+void chibi_serve(char *url, Handler handler) {
+  h = handler;
+}
 
 
 void *workerThread(void *workQueue) {
   WorkQueue * wq = (WorkQueue *) workQueue;
   Work *w = NULL;
   Request *r = NULL;
+  Response *resp = NULL;
   char request[REQUEST_SIZE];
+  int len = 0;
   while(1) {
     w = work_get(wq);
     printf("Thread 0x%x got work\n", (int) pthread_self());
-    if (recv(w->fd, request, REQUEST_SIZE, 0) == -1) {
+    memset(request, '\0', REQUEST_SIZE);
+    len = recv(w->fd, request, REQUEST_SIZE, 0);
+    if (len <= 0) {
       free(w);
       continue;
     }
+    printf("LEN:%d\n", len);
     r = http_parseRequest(request);
-    request_free(r);
-    http_response(w->fd, 200, "Hello world", 11);
+    resp = h(r);
+    if (resp == NULL) {
+      resp = response_new(404, "Hello world", 11);
+    }
+    write(w->fd, resp->msg, resp->len);
     close(w->fd);
+    request_free(r);
+    response_free(resp);
     free(w);
   }
   pthread_exit(0);
 }
 
-int main(int argc, char const *argv[]) {
+int chibi_run(int port, int poolSize) {
     pthread_t workerPool[POOL_SIZE];
     WorkQueue workQueue;
+    workQueue.work = NULL;
     pthread_mutex_init(&(workQueue.lock), NULL);
     pthread_cond_init(&(workQueue.cond), NULL);
 
@@ -55,7 +73,7 @@ int main(int argc, char const *argv[]) {
 
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    serv_addr.sin_port = htons(5000);
+    serv_addr.sin_port = htons(port);
 
     // lose the pesky "Address already in use" error message
     if (setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof yes) == -1) {
@@ -80,5 +98,5 @@ int main(int argc, char const *argv[]) {
         work_put(&workQueue, w);
      }
      close(listenfd);
-
+     return 0;
 }

@@ -1,7 +1,7 @@
 #ifndef REQUEST_H
 #define REQUEST_H
 
-#define REQUEST_SIZE 1500
+#include "chibiWebDefs.h"
 
 typedef struct param {
   char *key;

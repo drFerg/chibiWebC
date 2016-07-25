@@ -21,16 +21,24 @@ int generateResponse(char *buffer, int buffSize, int response, int length, int c
     length);
 }
 
-int http_response(int fd, int status, char *text, int len) {
-  char header[1000];
+Response *response_new(int status, char *text, int len) {
+  Response *resp = (Response *) malloc(sizeof (Response));
+  if (resp == NULL) return NULL;
+  resp->hdrLen = generateResponse(resp->header, RESPONSE_HDR_SIZE, status, len, 0);
+  resp->len = resp->hdrLen + len + 1;
+  resp->msg = (char *) malloc(resp->len);
+  if (resp->msg == NULL) {
+    free(resp);
+    return NULL;
+  }
+  memcpy(resp->msg, resp->header, resp->hdrLen);
+  memcpy(resp->msg + resp->hdrLen, text, len);
+  resp->msg[resp->len - 1] = '\0';
+  printf("RESPONSE:\n%s\n################\n", resp->msg);
+  return resp;
+}
 
-  int hdrLen = generateResponse(header, 1000, status, len, 0);
-  int responseLen = hdrLen + len + 1;
-  char *response = (char *) malloc(responseLen);
-  if (response == NULL) return -1;
-  memcpy(response, header, hdrLen);
-  memcpy(response + hdrLen, text, len);
-  response[responseLen - 1] = '\0';
-  printf("RESPONSE:\n%s\n################\n", response);
-  return write(fd, response, responseLen);
+void response_free(Response *resp) {
+  free(resp->msg);
+  free(resp);
 }
