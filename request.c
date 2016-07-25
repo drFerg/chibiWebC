@@ -8,9 +8,8 @@
 Request *request_new() {
   Request *r = (Request *) malloc (sizeof(Request));
   if (r == NULL) return NULL;
-  //memset(r->buf, '\0', REQUEST_SIZE);
   r->type = NULL;
-  r->url = NULL;
+  r->path = NULL;
   r->param = NULL;
   return r;
 }
@@ -54,11 +53,11 @@ Request *http_parseRequest(char *request) {
     return NULL;
   }
   /* Get request URL + params */
-  r->url = strtok_r(NULL, " ", &hdrsave);
+  r->path = strtok_r(NULL, " ", &hdrsave);
   /* Check if we have a list of query parameters and seperate */
-  char *url = strtok_r(r->url, "?", &urlsave);
+  char *url = strtok_r(r->path, "?", &urlsave);
   printf("URL: %s\n", url);
-  if (url) r->url = url;
+  if (url) r->path = url;
   else return r;
 
   /* Get query param half */

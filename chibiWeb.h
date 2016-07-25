@@ -6,7 +6,17 @@
 
 typedef Response * (*Handler)(Request *);
 
-void chibi_serve(char *url, Handler handler);
+
+void chibi_init();
+
+/* Adds a path to serve which is handled by the provided handler
+ *
+ * handler needs to expect a Request * and return a Response * to send back to
+ * the client.
+ */
+int chibi_serve(char *path, Handler handler);
+
+/* Starts the server, does not return control */
 int chibi_run(int port, int poolSize);
 
 #endif /* CHIBI_WEB_H */

@@ -12,7 +12,7 @@ typedef struct param {
 typedef struct request {
     char *buf;
     char *type;
-    char *url;
+    char *path;
     char *paramStr;
     Param *param;
 } Request;

@@ -1,4 +1,3 @@
-
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -16,14 +15,37 @@
 #include "request.h"
 #include "response.h"
 #include "chibiWebDefs.h"
+#include "tsQueue.h"
+
 #define POOL_SIZE 4
 
+typedef struct pHandle {
+  char* path;
+  Handler handler;
+}PathHandle;
 
 Handler h = NULL;
-void chibi_serve(char *url, Handler handler) {
-  h = handler;
+TSQueue *paths;
+
+void chibi_init() {
+  paths = tsq_create();
 }
 
+int chibi_serve(char *path, Handler handler) {
+  PathHandle *p = (PathHandle *) malloc(sizeof(PathHandle));
+  if (p == NULL) return 0;
+  p->path = path;
+  p->handler = handler;
+  if (tsq_put(paths, p)) return 1;
+  free(p);
+  return 0;
+}
+
+int find_path(void *a, void *b) {
+  char *path = (char *) a;
+  PathHandle *phb = (PathHandle *) b;
+  return !strcmp(path, phb->path);
+}
 
 void *workerThread(void *workQueue) {
   WorkQueue * wq = (WorkQueue *) workQueue;
@@ -43,10 +65,16 @@ void *workerThread(void *workQueue) {
     }
     printf("LEN:%d\n", len);
     r = http_parseRequest(request);
-    resp = h(r);
+
+    /* find matching path for request */
+    PathHandle *ph = (PathHandle *) tsq_find(paths, find_path, r->path);
+    if (ph != NULL) resp = ph->handler(r);
+    else resp = NULL;
     if (resp == NULL) {
-      resp = response_new(404, "Hello world", 11);
+      resp = response_new(404, "", 0);
     }
+
+    /* Write response back to client */
     write(w->fd, resp->msg, resp->len);
     close(w->fd);
     request_free(r);
@@ -62,7 +90,6 @@ int chibi_run(int port, int poolSize) {
     workQueue.work = NULL;
     pthread_mutex_init(&(workQueue.lock), NULL);
     pthread_cond_init(&(workQueue.cond), NULL);
-
 
     int listenfd;
     struct sockaddr_in serv_addr;
@@ -88,7 +115,7 @@ int chibi_run(int port, int poolSize) {
     for (int i = 0; i < POOL_SIZE; i++) {
       pthread_create(&workerPool[i], NULL, workerThread, (void*) &workQueue);
     }
-    listen(listenfd, 10);
+    listen(listenfd, LISTEN_WAITERS);
     Work *w;
     while(1) {
         w = (Work *) malloc(sizeof(Work));
