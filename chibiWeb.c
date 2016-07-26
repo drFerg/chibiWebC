@@ -11,7 +11,6 @@
 #include <pthread.h>
 
 #include "chibiWeb.h"
-#include "work.h"
 #include "request.h"
 #include "response.h"
 #include "chibiWebDefs.h"
@@ -25,10 +24,11 @@ typedef struct pHandle {
 }PathHandle;
 
 Handler h = NULL;
-TSQueue *paths;
+TSQueue *paths, *workQ;
 
 void chibi_init() {
   paths = tsq_create();
+  workQ = tsq_create();
 }
 
 int chibi_serve(char *path, Handler handler) {
@@ -48,19 +48,19 @@ int find_path(void *a, void *b) {
 }
 
 void *workerThread(void *workQueue) {
-  WorkQueue * wq = (WorkQueue *) workQueue;
-  Work *w = NULL;
+  TSQueue * wq = (TSQueue *) workQueue;
+  int *clientfd = NULL;
   Request *r = NULL;
   Response *resp = NULL;
   char request[REQUEST_SIZE];
   int len = 0;
   while(1) {
-    w = work_get(wq);
+    clientfd = tsq_get(wq);
     printf("Thread 0x%x got work\n", (int) pthread_self());
     memset(request, '\0', REQUEST_SIZE);
-    len = recv(w->fd, request, REQUEST_SIZE, 0);
+    len = recv(*clientfd, request, REQUEST_SIZE, 0);
     if (len <= 0) {
-      free(w);
+      free(clientfd);
       continue;
     }
     printf("LEN:%d\n", len);
@@ -75,21 +75,17 @@ void *workerThread(void *workQueue) {
     }
 
     /* Write response back to client */
-    write(w->fd, resp->msg, resp->len);
-    close(w->fd);
+    write(*clientfd, resp->msg, resp->len);
+    close(*clientfd);
     request_free(r);
     response_free(resp);
-    free(w);
+    free(clientfd);
   }
   pthread_exit(0);
 }
 
 int chibi_run(int port, int poolSize) {
     pthread_t workerPool[POOL_SIZE];
-    WorkQueue workQueue;
-    workQueue.work = NULL;
-    pthread_mutex_init(&(workQueue.lock), NULL);
-    pthread_cond_init(&(workQueue.cond), NULL);
 
     int listenfd;
     struct sockaddr_in serv_addr;
@@ -113,16 +109,15 @@ int chibi_run(int port, int poolSize) {
     }
 
     for (int i = 0; i < POOL_SIZE; i++) {
-      pthread_create(&workerPool[i], NULL, workerThread, (void*) &workQueue);
+      pthread_create(&workerPool[i], NULL, workerThread, (void*) workQ);
     }
     listen(listenfd, LISTEN_WAITERS);
-    Work *w;
+    int *clientfd;
     while(1) {
-        w = (Work *) malloc(sizeof(Work));
-        if (w == NULL) break;
-        w->next = NULL;
-        w->fd = accept(listenfd, (struct sockaddr*) NULL, NULL);
-        work_put(&workQueue, w);
+        clientfd = (int *) malloc(sizeof(int));
+        if (clientfd == NULL) break;
+        *clientfd = accept(listenfd, (struct sockaddr*) NULL, NULL);
+        tsq_put(workQ, clientfd);
      }
      close(listenfd);
      return 0;

@@ -1,7 +1,7 @@
 
 CFLAGS+=-Wall -g -pthread
 
-INC=chibiServer.c chibiWeb.c request.c response.c work.c dataStructures/tsQueue.c
+INC=chibiServer.c chibiWeb.c request.c response.c dataStructures/tsQueue.c
 LIBS=-IdataStructures/
 
 all: server
