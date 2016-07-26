@@ -1,10 +1,15 @@
+CC=gcc
+CFLAGS+=-Wall -g -pthread -IdataStructures/
 
-CFLAGS+=-Wall -g -pthread
-
-INC=chibiServer.c chibiWeb.c request.c response.c dataStructures/tsQueue.c
-LIBS=-IdataStructures/
+OBJ=chibiServer.o chibiWeb.o request.o response.o dataStructures/tsQueue.o
+LDFLAGS=-IdataStructures/
 
 all: server
 
-server: $(INC)
-	gcc $(CFLAGS) $(INC) $(LIBS) -o chibiServer
+server: $(OBJ)
+	$(CC) $(CFLAGS) $(OBJ) $(LDFLAGS) -o chibiServer
+
+clean:
+	rm *.o chibiServer
+
+.PHONY: clean
