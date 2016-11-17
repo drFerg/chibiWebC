@@ -37,7 +37,8 @@ void request_addParam(Request *r, Param *p) {
   }
 }
 
-Request *http_parseRequest(char *request) {
+Request *request_parse(char *request) {
+  int pathLen = 0;
   Request *r = request_new();
   if (r == NULL) return NULL;
   r->buf = request;
@@ -56,35 +57,38 @@ Request *http_parseRequest(char *request) {
   r->path = strtok_r(NULL, " ", &hdrsave);
   /* Check if we have a list of query parameters and seperate */
   char *url = strtok_r(r->path, "?", &urlsave);
-  printf("URL: %s\n", url);
-  if (url) r->path = url;
-  else return r;
-
-  /* Get query param half */
+  printf("URL: %s(%s)\n", url, (url? "true":"false"));
   r->paramStr = strtok_r(NULL, "?", &urlsave);
-  if (r->paramStr == NULL) return r;
-  printf("paramstr:%s\n", r->paramStr);
-  /* Do we have more than one? (Split by &) */
-  char *q = strtok_r(r->paramStr, "&", &urlsave);
-  if (q == NULL) q = r->paramStr;
+  if (r->paramStr) {
+    r->path = url;
+    /* Get query param half */
+    printf("paramstr:%s\n", r->paramStr);
+    /* Do we have more than one? (Split by &) */
+    char *q = strtok_r(r->paramStr, "&", &urlsave);
+    if (q == NULL) q = r->paramStr;
 
-  /* Retrieve params */
-  Param *p, *lastP;
-  do {
-    p = (Param *) malloc(sizeof(Param));
-    if (p == NULL) {
-      request_free(r);
-      return NULL;
-    }
-    /* Key, value pairs are split by = */
-    p->key = strtok_r(q, "=", &querysave);
-    p->value = strtok_r(NULL, "=", &querysave);
-    p->next = NULL;
-    printf("%s:%s\n", p->key, p->value);
-    /* Add to param list */
-    if (r->param == NULL) r->param = p;
-    else lastP->next = p;
-    lastP = p;  /* Used for next iteration, makes insertion O(1) */
-  } while((q = strtok_r(NULL, "&", &urlsave))); /* Next param */
+    /* Retrieve params */
+    Param *p, *lastP;
+    do {
+      p = (Param *) malloc(sizeof(Param));
+      if (p == NULL) {
+        request_free(r);
+        return NULL;
+      }
+      /* Key, value pairs are split by = */
+      p->key = strtok_r(q, "=", &querysave);
+      p->value = strtok_r(NULL, "=", &querysave);
+      p->next = NULL;
+      printf("%s:%s\n", p->key, p->value);
+      /* Add to param list */
+      if (r->param == NULL) r->param = p;
+      else lastP->next = p;
+      lastP = p;  /* Used for next iteration, makes insertion O(1) */
+    } while((q = strtok_r(NULL, "&", &urlsave))); /* Next param */
+  }
+  pathLen = strlen(r->path);
+  /* Remove trailing forward-slash (/) */
+  if (pathLen > 1 && r->path[pathLen - 1] == '/') r->path[pathLen - 1] = '\0';
+  printf("PATH: %i: %s\n", pathLen, r->path);
   return r;
 }

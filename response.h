@@ -8,6 +8,8 @@ typedef struct response {
   char *msg;
   int hdrLen;
   int len;
+  int file;
+  int fileLen;
 } Response;
 
 Response *response_new(int status, char *text, int len);

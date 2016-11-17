@@ -24,6 +24,7 @@ int generateResponse(char *buffer, int buffSize, int response, int length, int c
 Response *response_new(int status, char *text, int len) {
   Response *resp = (Response *) malloc(sizeof (Response));
   if (resp == NULL) return NULL;
+  resp->file = 0;
   resp->hdrLen = generateResponse(resp->header, RESPONSE_HDR_SIZE, status, len, 0);
   resp->len = resp->hdrLen + len + 1;
   resp->msg = (char *) malloc(resp->len);

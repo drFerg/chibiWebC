@@ -16,10 +16,10 @@ typedef struct request {
     char *paramStr;
     Param *param;
 } Request;
-
+/* parse a char request and return a new filled request */
+Request *request_parse(char *request);
 Request *request_new();
-Request *http_parseRequest(char *request);
-void request_addParam(Request *r, Param *p);
 void request_free(Request *r);
+void request_addParam(Request *r, Param *p);
 
 #endif /* REQUEST_H */
