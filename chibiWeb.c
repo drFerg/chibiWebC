@@ -64,7 +64,7 @@ void *workerThread(void *workQueue) {
       continue;
     }
     printf("LEN:%d\n", len);
-    r = http_parseRequest(request);
+    r = request_parse(request);
 
     /* find matching path for request */
     PathHandle *ph = (PathHandle *) tsq_find(paths, find_path, r->path);

@@ -37,7 +37,7 @@ void request_addParam(Request *r, Param *p) {
   }
 }
 
-Request *http_parseRequest(char *request) {
+Request *request_parse(char *request) {
   Request *r = request_new();
   if (r == NULL) return NULL;
   r->buf = request;
