@@ -18,7 +18,7 @@ typedef struct request {
 } Request;
 
 Request *request_new();
-Request *http_parseRequest(char *request);
+Request *request_parse(char *request);
 void request_addParam(Request *r, Param *p);
 void request_free(Request *r);
 
