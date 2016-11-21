@@ -15,6 +15,7 @@ void chibi_init();
  * the client.
  */
 int chibi_serve(char *path, Handler handler);
+int chibi_serveFiles(char *path, char *localPath);
 
 /* Starts the server, does not return control */
 int chibi_run(int port, int poolSize);

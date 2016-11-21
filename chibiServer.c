@@ -13,7 +13,7 @@ Response *dogHandler(Request *r) {
 
 int main(int argc, char const *argv[]) {
   chibi_init();
-  chibi_serve("/", testHandler);
+  chibi_serveFiles("/static", ".");
   chibi_serve("/dogs", dogHandler);
   chibi_run(5000, 4);
   return 0;

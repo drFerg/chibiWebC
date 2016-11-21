@@ -13,13 +13,15 @@ typedef struct request {
     char *buf;
     char *type;
     char *path;
+    char *root;
+    char *file;
     char *paramStr;
     Param *param;
 } Request;
-
-Request *request_new();
+/* parse a char request and return a new filled request */
 Request *request_parse(char *request);
-void request_addParam(Request *r, Param *p);
+Request *request_new();
 void request_free(Request *r);
+void request_addParam(Request *r, Param *p);
 
 #endif /* REQUEST_H */
