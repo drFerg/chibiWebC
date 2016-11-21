@@ -8,7 +8,8 @@ Current target features are:
  - GET request parameter support (done)
  - POST request support
  - Path recognition support with callback handlers (done)
- - File serving
+ - File serving (done)
+ - HTML Templating
 
 Design decisions
 ----------------
