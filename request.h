@@ -13,6 +13,8 @@ typedef struct request {
     char *buf;
     char *type;
     char *path;
+    char *root;
+    char *file;
     char *paramStr;
     Param *param;
 } Request;

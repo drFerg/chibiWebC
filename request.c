@@ -49,20 +49,23 @@ Request *request_parse(char *request) {
   r->type = strtok_r(r->buf, " ", &hdrsave);
   printf("Request:%s\n", r->type);
   if (strncmp(r->type, "GET", 3) != 0) {
-    printf("We only accept gets\n");
+    printf("We only accept GET\n");
     request_free(r);
     return NULL;
   }
   /* Get request URL + params */
   r->path = strtok_r(NULL, " ", &hdrsave);
-  /* Check if we have a list of query parameters and seperate */
+  printf("PATH: %i: %s\n", pathLen, r->path);
+
+  /* Chop off parameters, finishing path */
   char *url = strtok_r(r->path, "?", &urlsave);
-  printf("URL: %s(%s)\n", url, (url? "true":"false"));
+  printf("URL: %s (%s)\n", url, (url ? "true":"false"));
   r->paramStr = strtok_r(NULL, "?", &urlsave);
   if (r->paramStr) {
     r->path = url;
     /* Get query param half */
-    printf("paramstr:%s\n", r->paramStr);
+    printf("ParamStr: %s\n", r->paramStr);
+    printf("Params:\n");
     /* Do we have more than one? (Split by &) */
     char *q = strtok_r(r->paramStr, "&", &urlsave);
     if (q == NULL) q = r->paramStr;
@@ -79,7 +82,7 @@ Request *request_parse(char *request) {
       p->key = strtok_r(q, "=", &querysave);
       p->value = strtok_r(NULL, "=", &querysave);
       p->next = NULL;
-      printf("%s:%s\n", p->key, p->value);
+      printf("\t%s: %s\n", p->key, p->value);
       /* Add to param list */
       if (r->param == NULL) r->param = p;
       else lastP->next = p;
@@ -87,8 +90,12 @@ Request *request_parse(char *request) {
     } while((q = strtok_r(NULL, "&", &urlsave))); /* Next param */
   }
   pathLen = strlen(r->path);
+  r->root = strdup(r->path);
+  strtok_r(r->root + 1, "/", &urlsave);
+  r->file = urlsave;
+  printf("Root: %s\nFile: %s\n", r->root, urlsave);
   /* Remove trailing forward-slash (/) */
   if (pathLen > 1 && r->path[pathLen - 1] == '/') r->path[pathLen - 1] = '\0';
-  printf("PATH: %i: %s\n", pathLen, r->path);
+  printf("PATH(%i): %s\n", pathLen, r->path);
   return r;
 }

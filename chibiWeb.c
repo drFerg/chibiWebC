@@ -20,10 +20,11 @@
 
 #define POOL_SIZE 4
 #define BUFSIZE 1000
+
 typedef struct pHandle {
   char* path;
   Handler handler;
-}PathHandle;
+} PathHandle;
 
 Handler h = NULL;
 TSQueue *filePaths, *paths, *workQ;
@@ -37,14 +38,14 @@ void chibi_init() {
 Response *serveFile(Request *r) {
   off_t file_size;
   struct stat stbuf;
-  int fd = open(r->path, O_RDONLY);
-  printf("SERVING FILE: %s\n", r->path);
+  int fd = open(r->file, O_RDONLY);
+  printf("SERVING FILE: %s\n", r->file);
   if ((fstat(fd, &stbuf) != 0) || (!S_ISREG(stbuf.st_mode))) {}
   close(fd);
   /* Handle error */
 
   file_size = stbuf.st_size;
-  Response *resp = response_new(200, "", 0);
+  Response *resp = response_new_file(200, 0, file_size);
   resp->file = 1;
   resp->fileLen = file_size;
   return resp;
@@ -75,11 +76,8 @@ int find_path(void *a, void *b) {
   return !strcmp(path, phb->path);
 }
 
-
-
-
-
 int transferFile(int clientfd, char *filename) {
+  printf("Transferring file: %s\n", filename);
   int fd = open(filename, O_RDONLY);
   if (fd < 0) return 0;
   char buf[BUFSIZE];
@@ -89,9 +87,11 @@ int transferFile(int clientfd, char *filename) {
   while(1) {
     bytesRead = read(fd, buf, BUFSIZE);
     if (bytesRead <= 0) break;
+    printf("Read: %d\n", bytesRead);
     p = buf;
     while (bytesRead > 0) {
       bytesSent = write(clientfd, p, bytesRead);
+      printf("Wrote: %d\n", bytesSent);
       if (bytesSent <= 0) break;
       bytesRead -= bytesSent;
       p += bytesSent;
@@ -100,13 +100,13 @@ int transferFile(int clientfd, char *filename) {
   if (bytesRead < 0) printf("READ ERROR\n");
   if (bytesSent < 0) printf("WRITE ERROR\n");
   close(fd);
-  return 1;
+  return bytesSent;
 }
 
 void *workerThread(void *workQueue) {
-  TSQueue * wq = (TSQueue *) workQueue;
+  TSQueue *wq = (TSQueue *) workQueue;
   int *clientfd = NULL;
-  Request *r = NULL;
+  Request *req = NULL;
   Response *resp = NULL;
   char request[REQUEST_SIZE];
   int len = 0;
@@ -120,26 +120,29 @@ void *workerThread(void *workQueue) {
       continue;
     }
     printf("LEN:%d\n", len);
-    r = request_parse(request);
+    req = request_parse(request);
 
     /* find matching path for request */
-    PathHandle *ph = (PathHandle *) tsq_find(filePaths, find_path, r->path);
+    PathHandle *ph = (PathHandle *) tsq_find(filePaths, find_path, req->root);
     if (ph != NULL) {
-      serveFile();
+      resp = serveFile(req);
+    } else {
+      printf("No matching filepath\n");
+      /* Call client response handler */
+      ph = (PathHandle *) tsq_find(paths, find_path, req->path);
+      if (ph != NULL) resp = ph->handler(req);
+      else resp = NULL;
     }
-    ph = (PathHandle *) tsq_find(paths, find_path, r->path);
-    /* Call client response handler */
-    if (ph != NULL) resp = ph->handler(r);
-    else resp = NULL;
+
     if (resp == NULL) {
       resp = response_new(404, "", 0);
     }
 
     /* Write response back to client */
     write(*clientfd, resp->msg, resp->len);
-    if (resp->file) transferFile(*clientfd, r->path);
+    if (resp->file) transferFile(*clientfd, req->file);
     close(*clientfd);
-    request_free(r);
+    request_free(req);
     response_free(resp);
     free(clientfd);
   }

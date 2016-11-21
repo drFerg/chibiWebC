@@ -13,6 +13,7 @@ typedef struct response {
 } Response;
 
 Response *response_new(int status, char *text, int len);
+Response *response_new_file(int status, int type, int len);
 void response_free(Response *resp);
 
 #endif /* RESPONSE_H */
