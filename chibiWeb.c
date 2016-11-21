@@ -121,7 +121,6 @@ void *workerThread(void *workQueue) {
     }
     printf("LEN:%d\n", len);
     req = request_parse(request);
-
     /* find matching path for request */
     PathHandle *ph = (PathHandle *) tsq_find(filePaths, find_path, req->root);
     if (ph != NULL) {
