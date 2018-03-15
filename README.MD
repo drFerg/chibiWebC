@@ -4,12 +4,12 @@ ChibiWebC
 ChibiWebC is an adventure in writing a small web-server in C.
 
 Current target features are:
- [x] Multi-threading (done)
- [x] GET request parameter support (done)
- [] POST request support
- [x] Path recognition support with callback handlers (done)
- [x] File serving (basic)
- [] HTML Templating
+ - [x] Multi-threading (done)
+ - [x] GET request parameter support (done)
+ - [] POST request support
+ - [x] Path recognition support with callback handlers (done)
+ - [x] File serving (basic)
+ - [] HTML Templating
 
 Design decisions
 ----------------
