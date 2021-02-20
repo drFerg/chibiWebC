@@ -45,10 +45,10 @@ int tsq_put(TSQueue *tsq, void *payload) {
   elem->payload = payload;
   elem->next = NULL;
 
+  pthread_mutex_lock(&(tsq->lock));
   if (tsq->elem == NULL) tsq->elem = elem;
-  else {
-    for(e = tsq->elem; e->next != NULL; e = e->next)
-    ;
+  else { // add to the end of the queue
+    for(e = tsq->elem; e->next != NULL; e = e->next);
     e->next = elem;
   }
   pthread_cond_signal(&(tsq->cond));
