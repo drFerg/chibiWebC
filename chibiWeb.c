@@ -43,8 +43,18 @@ void interruptHandler(int dummy) {
   keepRunning = FALSE;
 }
 
+void setup_signal_handler(){
+  // use sigaction to stop blocking calls from restarting after interrupts
+  struct sigaction a;
+  a.sa_handler = interruptHandler;
+  a.sa_flags = 0;
+  sigemptyset(&a.sa_mask);
+  sigaction(SIGINT, &a, NULL);
+}
+
 int chibi_init() {
-  signal(SIGINT, interruptHandler);
+  setup_signal_handler();
+
   filePaths = tsq_create();
   if (!filePaths) {
     printf("Failed to init filePaths queue\n");
@@ -222,6 +232,8 @@ int chibi_run(int port, int poolSize) {
       if (clientfd == NULL) break;
 
       *clientfd = accept(listenfd, (struct sockaddr*) NULL, NULL);
+      // check for signal interrupt
+      if (*clientfd == -1 & errno == EINTR) break;
       // got a valid fd, add to queue to service
       tsq_put(workQ, clientfd);
     }
