@@ -35,13 +35,11 @@ static volatile int keepRunning = TRUE;
 
 void pathhandle_free(void* ph) {
   PathHandle* p = (PathHandle*) ph;
-  printf("Freeing ph %s\n", p->path);
   free(p->path);
   free(p);
 }
 
 void interruptHandler(int dummy) {
-  printf("Received SIGINT\n");
   keepRunning = FALSE;
 }
 
@@ -144,10 +142,8 @@ void *workerThread(void *workQueue) {
   while(keepRunning) {
     clientfd = tsq_get(wq);
     /* Check for stop sentinel */
-    if (*clientfd == -1) {
-      printf("Thread %p got stop sentinel\n", pthread_self());
-      break;
-    }
+    if (*clientfd == -1) break;
+
     /* Otherwise got work */
     printf("Thread %p got work\n", pthread_self());
     memset(request, '\0', REQUEST_SIZE);
@@ -190,7 +186,7 @@ int chibi_run(int port, int poolSize) {
     pthread_t workerPool[POOL_SIZE];
     int listenfd;
     struct sockaddr_in serv_addr;
-    int yes = 1;
+    int socket_yes = 1;
 
     listenfd = socket(AF_INET, SOCK_STREAM, 0);
     memset(&serv_addr, '\0', sizeof serv_addr);
@@ -200,8 +196,8 @@ int chibi_run(int port, int poolSize) {
     serv_addr.sin_port = htons(port);
 
     printf("> opening socket on port: %d\n", port);
-    // lose the pesky "Address already in use" error message
-    if (setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof yes) == -1) {
+    // set SO_REUSEADDR to prevent "Address already in use"
+    if (setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, &socket_yes, sizeof socket_yes) == -1) {
         perror("setsockopt");
         exit(1);
     }
@@ -210,27 +206,29 @@ int chibi_run(int port, int poolSize) {
       exit(1);
     }
     printf("> bound socket\n");
-    printf("> creating workers...\n");
+    printf("> creating workers...");
     for (int i = 0; i < POOL_SIZE; i++) {
       pthread_create(&workerPool[i], NULL, workerThread, (void*) workQ);
     }
-    printf("> created workers (%d)\n", POOL_SIZE);
+    printf(" created %d\n", POOL_SIZE);
 
     printf("> listening on: http://127.0.0.1:%d\n", port);
     listen(listenfd, LISTEN_WAITERS);
     int *clientfd;
+
+    // main loop for receiving incoming requests
     while(keepRunning) {
       clientfd = (int *) malloc(sizeof(int));
       if (clientfd == NULL) break;
+
       *clientfd = accept(listenfd, (struct sockaddr*) NULL, NULL);
+      // got a valid fd, add to queue to service
       tsq_put(workQ, clientfd);
     }
 
-    printf("Exiting\n");
-    tsq_destroy(paths, pathhandle_free);
-    printf("paths freed\n");
+    printf("> exiting\n");
     void *result = NULL;
-    printf("> joining threads\n");
+    printf("> stopping threads...");
 
     /* fill workQ with stop sentinels */
     int stopSentinel = -1;
@@ -241,18 +239,21 @@ int chibi_run(int port, int poolSize) {
     /* Wait on threads to pick up sentinel and stop gracefully */
     for (int i = 0; i < POOL_SIZE; i++) {
       pthread_join(workerPool[i], &result);
-      printf(">> thread %d stopped\n", i);
+      printf(" [%d]", i);
     }
+    printf("done\n");
 
+    printf("> freeing resources...");
+    // free data stores
     tsq_destroy(workQ, NULL);
-    printf("workq freed\n");
     tsq_destroy(paths, &pathhandle_free);
-    printf("paths freed\n");
     tsq_destroy(filePaths, &pathhandle_free);
-    printf("filepaths freed");
 
-    
+    // free/close file descriptors
     if (clientfd) free(clientfd);
     close(listenfd);
+
+    printf("done\n");
+    printf("Shutdown complete\n");
     return 0;
 }
