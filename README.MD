@@ -1,3 +1,5 @@
+[![C CI](https://github.com/fergul/chibiWebC/actions/workflows/c-cpp.yml/badge.svg)](https://github.com/fergul/chibiWebC/actions/workflows/c-cpp.yml)
+
 ChibiWebC
 =========
 
