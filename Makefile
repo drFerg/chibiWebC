@@ -4,7 +4,10 @@ CFLAGS+=-Wall -g -pthread -IdataStructures/
 OBJ=chibiServer.o chibiWeb.o request.o response.o dataStructures/tsQueue.o
 LDFLAGS=-IdataStructures/
 
-all: server
+all: server adts
+
+adts:
+	$(MAKE) -C dataStructures
 
 server: $(OBJ)
 	$(CC) $(CFLAGS) $(OBJ) $(LDFLAGS) -o chibiServer
@@ -12,4 +15,4 @@ server: $(OBJ)
 clean:
 	rm *.o chibiServer
 
-.PHONY: clean
+.PHONY: clean adts
