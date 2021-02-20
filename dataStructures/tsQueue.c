@@ -26,16 +26,16 @@ void tsq_destroy(TSQueue *tsq, void (*payloadFree)(void *payload)) {
 }
 
 void *tsq_get(TSQueue *tsq) {
-  void *q = NULL;
+  void *payload = NULL;
   Elem *e = NULL;
   pthread_mutex_lock(&(tsq->lock));
   while (tsq->elem == NULL) pthread_cond_wait(&(tsq->cond), &(tsq->lock));
   e = tsq->elem;
-  q = tsq->elem->payload;
-  tsq->elem = tsq->elem->next;
+  payload = e->payload;
+  tsq->elem = e->next;
   pthread_mutex_unlock(&(tsq->lock));
   free(e);
-  return q;
+  return payload;
 }
 
 int tsq_put(TSQueue *tsq, void *payload) {
@@ -56,12 +56,15 @@ int tsq_put(TSQueue *tsq, void *payload) {
   return 1;
 }
 
-void *tsq_find(TSQueue *tsq, int (*equal)(void *a, void *b), void *a) {
-  void *b = NULL;
+/**
+ * Find the last element matching the key using the specified equal function.
+ */
+void *tsq_find(TSQueue *tsq, int (*equal_fn)(void *a, void *b), void *key) {
+  void *value = NULL;
   pthread_mutex_lock(&(tsq->lock));
   for(Elem *e = tsq->elem; e != NULL; e = e->next) {
-    if (equal(a, e->payload)) b = e->payload;
+    if (equal_fn(key, e->payload)) value = e->payload;
   }
   pthread_mutex_unlock(&(tsq->lock));
-  return b;
+  return value;
 }
