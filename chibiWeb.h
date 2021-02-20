@@ -4,10 +4,13 @@
 #include "response.h"
 #include "request.h"
 
+#define FALSE 0
+#define TRUE 1
+
 typedef Response * (*Handler)(Request *);
 
 
-void chibi_init();
+int chibi_init();
 
 /* Adds a path to serve which is handled by the provided handler
  *

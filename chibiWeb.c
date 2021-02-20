@@ -11,6 +11,7 @@
 #include <pthread.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <signal.h>
 
 #include "chibiWeb.h"
 #include "request.h"
@@ -28,11 +29,40 @@ typedef struct pHandle {
 
 Handler h = NULL;
 TSQueue *filePaths, *paths, *workQ;
+// use volatile to prevent compiler caching
+static volatile int keepRunning = TRUE;
 
-void chibi_init() {
+
+void pathhandle_free(void* ph) {
+  PathHandle* p = (PathHandle*) ph;
+  printf("Freeing ph %s\n", p->path);
+  free(p->path);
+  free(p);
+}
+
+void interruptHandler(int dummy) {
+  printf("Received SIGINT\n");
+  keepRunning = FALSE;
+}
+
+int chibi_init() {
+  signal(SIGINT, interruptHandler);
   filePaths = tsq_create();
+  if (!filePaths) {
+    printf("Failed to init filePaths queue\n");
+    return FALSE;
+  }
   paths = tsq_create();
+  if (!paths) {
+    printf("Failed to init paths queue\n");
+    return FALSE;
+  }
   workQ = tsq_create();
+  if (!workQ) {
+    printf("Failed to init work queue\n");
+    return FALSE;
+  }
+  return TRUE;
 }
 
 Response *serveFile(Request *r) {
@@ -57,10 +87,11 @@ int serve(char *path, Handler handler, TSQueue *tsq) {
   p->path = strdup(path);
   p->handler = handler;
   if (tsq_put(tsq, p)) return 1;
-  free(p->path);
-  free(p);
+  pathhandle_free(p);
   return 0;
 }
+
+
 
 int chibi_serve(char *path, Handler handler) {
   return serve(path, handler, paths);
@@ -110,8 +141,14 @@ void *workerThread(void *workQueue) {
   Response *resp = NULL;
   char request[REQUEST_SIZE];
   int len = 0;
-  while(1) {
+  while(keepRunning) {
     clientfd = tsq_get(wq);
+    /* Check for stop sentinel */
+    if (*clientfd == -1) {
+      printf("Thread %p got stop sentinel\n", pthread_self());
+      break;
+    }
+    /* Otherwise got work */
     printf("Thread %p got work\n", pthread_self());
     memset(request, '\0', REQUEST_SIZE);
     len = recv(*clientfd, request, REQUEST_SIZE, 0);
@@ -149,8 +186,8 @@ void *workerThread(void *workQueue) {
 }
 
 int chibi_run(int port, int poolSize) {
+    printf("chibiWeb starting...\n");
     pthread_t workerPool[POOL_SIZE];
-
     int listenfd;
     struct sockaddr_in serv_addr;
     int yes = 1;
@@ -162,6 +199,7 @@ int chibi_run(int port, int poolSize) {
     serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
     serv_addr.sin_port = htons(port);
 
+    printf("> opening socket on port: %d\n", port);
     // lose the pesky "Address already in use" error message
     if (setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof yes) == -1) {
         perror("setsockopt");
@@ -171,18 +209,50 @@ int chibi_run(int port, int poolSize) {
       perror("bind");
       exit(1);
     }
-
+    printf("> bound socket\n");
+    printf("> creating workers...\n");
     for (int i = 0; i < POOL_SIZE; i++) {
       pthread_create(&workerPool[i], NULL, workerThread, (void*) workQ);
     }
+    printf("> created workers (%d)\n", POOL_SIZE);
+
+    printf("> listening on: http://127.0.0.1:%d\n", port);
     listen(listenfd, LISTEN_WAITERS);
     int *clientfd;
-    while(1) {
-        clientfd = (int *) malloc(sizeof(int));
-        if (clientfd == NULL) break;
-        *clientfd = accept(listenfd, (struct sockaddr*) NULL, NULL);
-        tsq_put(workQ, clientfd);
-     }
-     close(listenfd);
-     return 0;
+    while(keepRunning) {
+      clientfd = (int *) malloc(sizeof(int));
+      if (clientfd == NULL) break;
+      *clientfd = accept(listenfd, (struct sockaddr*) NULL, NULL);
+      tsq_put(workQ, clientfd);
+    }
+
+    printf("Exiting\n");
+    tsq_destroy(paths, pathhandle_free);
+    printf("paths freed\n");
+    void *result = NULL;
+    printf("> joining threads\n");
+
+    /* fill workQ with stop sentinels */
+    int stopSentinel = -1;
+    for (int i = 0; i < POOL_SIZE; i++) {
+      tsq_put(workQ, &stopSentinel);
+    }
+
+    /* Wait on threads to pick up sentinel and stop gracefully */
+    for (int i = 0; i < POOL_SIZE; i++) {
+      pthread_join(workerPool[i], &result);
+      printf(">> thread %d stopped\n", i);
+    }
+
+    tsq_destroy(workQ, NULL);
+    printf("workq freed\n");
+    tsq_destroy(paths, &pathhandle_free);
+    printf("paths freed\n");
+    tsq_destroy(filePaths, &pathhandle_free);
+    printf("filepaths freed");
+
+    
+    if (clientfd) free(clientfd);
+    close(listenfd);
+    return 0;
 }
