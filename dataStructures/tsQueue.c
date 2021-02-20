@@ -13,14 +13,15 @@ TSQueue *tsq_create() {
 
 void tsq_destroy(TSQueue *tsq, void (*payloadFree)(void *payload)) {
   Elem *e, *f;
+  pthread_mutex_lock(&(tsq->lock));
   e = tsq->elem;
-  if (payloadFree) {
-    while (e != NULL) {
-      f = e;
-      e = f->next;
-      payloadFree(f);
-    }
+  while (e != NULL) {
+    f = e;
+    e = f->next;
+    if (payloadFree) payloadFree(f->payload);
+    free(f);
   }
+  pthread_mutex_unlock(&(tsq->lock));
   free(tsq);
 }
 
