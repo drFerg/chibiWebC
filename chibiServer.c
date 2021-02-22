@@ -11,9 +11,15 @@ Response *dogHandler(Request *r) {
   return response_new(200, "WOOF!", 5);
 }
 
+Response *indexHandler(Request *r) {
+	return response_new_file(STATUS_200_OK, "./static/index.html");
+}
+
+
 int main(int argc, char const *argv[]) {
   chibi_init();
-  chibi_serveFiles("/static", ".");
+  chibi_serve("/", indexHandler);
+  chibi_serveFiles("/static", "static/");
   chibi_serve("/hello", testHandler);
   chibi_serve("/dogs", dogHandler);
   chibi_run(5000, 4);

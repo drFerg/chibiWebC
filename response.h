@@ -10,10 +10,11 @@ typedef struct response {
   int len;
   int file;
   int fileLen;
+  int fd;
 } Response;
 
 Response *response_new(int status, char *text, int len);
-Response *response_new_file(int status, int type, int len);
+Response *response_new_file(int status, char* filePath);
 void response_free(Response *resp);
 
 #endif /* RESPONSE_H */

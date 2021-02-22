@@ -24,6 +24,7 @@
 
 typedef struct pHandle {
   char* path;
+  char* localPath;
   Handler handler;
 } PathHandle;
 
@@ -32,11 +33,25 @@ TSQueue *filePaths, *paths, *workQ;
 // use volatile to prevent compiler caching
 static volatile int keepRunning = TRUE;
 
+/* Copy s1 and s2 into a new str and return it */
+char* strcatcpy(char* s1, char* s2) {
+  char* str = (char*) malloc(strlen(s1) + strlen(s2) + 1);
+  if (!str) return NULL;
 
+  sprintf(str, "%s%s", s1, s2);
+  return str;
+}
 void pathhandle_free(void* ph) {
   PathHandle* p = (PathHandle*) ph;
   free(p->path);
+  if (p->localPath) free(p->localPath);
   free(p);
+}
+
+int find_path(void *a, void *b) {
+  char *path = (char *) a;
+  PathHandle *phb = (PathHandle *) b;
+  return !strcmp(path, phb->path);
 }
 
 void interruptHandler(int dummy) {
@@ -73,28 +88,32 @@ int chibi_init() {
   return TRUE;
 }
 
-Response *serveFile(Request *r) {
-  off_t file_size;
-  struct stat stbuf;
-  int fd = open(r->file, O_RDONLY);
-  printf("SERVING FILE: %s\n", r->file);
-  if ((fstat(fd, &stbuf) != 0) || (!S_ISREG(stbuf.st_mode))) {}
-  close(fd);
-  /* Handle error */
+Response *serveFile(Request *req) {
+  PathHandle* ph = (PathHandle *) tsq_find(filePaths, find_path, req->root);
+  if (!ph) {
+    printf("serveFile: %s\n", req->root);
+    return 0;
+  }
+  req->file = strcatcpy(ph->localPath, req->file);
+  printf("Resolved filepath: %s\n", req->file);
 
-  file_size = stbuf.st_size;
-  Response *resp = response_new_file(200, 0, file_size);
-  resp->file = 1;
-  resp->fileLen = file_size;
-  return resp;
+  if (!req->file) return 0;
+
+  return response_new_file(STATUS_200_OK, req->file);
 }
 
-int serve(char *path, Handler handler, TSQueue *tsq) {
+int serve(char *path, char* localPath, Handler handler, TSQueue *tsq) {
   PathHandle *p = (PathHandle *) malloc(sizeof(PathHandle));
   if (p == NULL) return 0;
+  
+  // copy over paths
   p->path = strdup(path);
+  if (localPath) p->localPath = strdup(localPath);
   p->handler = handler;
+
   if (tsq_put(tsq, p)) return 1;
+  
+  // put failed, free and bail
   pathhandle_free(p);
   return 0;
 }
@@ -102,43 +121,42 @@ int serve(char *path, Handler handler, TSQueue *tsq) {
 
 
 int chibi_serve(char *path, Handler handler) {
-  return serve(path, handler, paths);
+  return serve(path, NULL, handler, paths);
 }
 
 int chibi_serveFiles(char *path, char *localPath) {
-  return serve(path, serveFile, filePaths);
+  return serve(path, localPath, serveFile, filePaths);
 }
 
-int find_path(void *a, void *b) {
-  char *path = (char *) a;
-  PathHandle *phb = (PathHandle *) b;
-  return !strcmp(path, phb->path);
-}
 
-int transferFile(int clientfd, char *filename) {
-  printf("Transferring file: %s\n", filename);
-  int fd = open(filename, O_RDONLY);
-  if (fd < 0) return 0;
+
+int transferFile(int clientfd, int fd) {
   char buf[BUFSIZE];
   int bytesRead = 0;
   int bytesSent = 0;
   char* p = NULL;
+  
+  printf("transferFile: starting transfer(%d -> %d)\n", fd, clientfd);
   while(1) {
+    // read a chunk
     bytesRead = read(fd, buf, BUFSIZE);
     if (bytesRead <= 0) break;
-    printf("Read: %d\n", bytesRead);
+
     p = buf;
     while (bytesRead > 0) {
+      // write a chunk
       bytesSent = write(clientfd, p, bytesRead);
-      printf("Wrote: %d\n", bytesSent);
       if (bytesSent <= 0) break;
+
       bytesRead -= bytesSent;
       p += bytesSent;
     }
   }
-  if (bytesRead < 0) printf("READ ERROR\n");
-  if (bytesSent < 0) printf("WRITE ERROR\n");
+  if (bytesRead < 0) perror("transferFile: READ ERROR\n");
+  if (bytesSent < 0) perror("transferFile: WRITE ERROR\n");
   close(fd);
+
+  printf("transferFile: transfer complete(%d -> %d)\n", fd, clientfd);
   return bytesSent;
 }
 
@@ -177,12 +195,13 @@ void *workerThread(void *workQueue) {
     }
 
     if (resp == NULL) {
-      resp = response_new(404, "", 0);
+      resp = response_new(STATUS_404_NOT_FOUND, "", 0);
     }
 
     /* Write response back to client */
     write(*clientfd, resp->msg, resp->len);
-    if (resp->file) transferFile(*clientfd, req->file);
+    if (resp->file) transferFile(*clientfd, resp->fd);
+    
     close(*clientfd);
     request_free(req);
     response_free(resp);
