@@ -4,11 +4,11 @@
 
 
 Response *testHandler(Request *r) {
-  return response_new(200, "HELLO", 5);
+  return response_new(STATUS_200_OK, "HELLO", 5);
 }
 
 Response *dogHandler(Request *r) {
-  return response_new(200, "WOOF!", 5);
+  return response_new(STATUS_200_OK, "WOOF!", 5);
 }
 
 Response *indexHandler(Request *r) {

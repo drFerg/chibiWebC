@@ -3,6 +3,10 @@
 
 #include "chibiWebDefs.h"
 
+// Response codes
+#define STATUS_200_OK 200
+#define STATUS_404_NOT_FOUND 404
+
 typedef struct response {
   char header[RESPONSE_HDR_SIZE];
   char *msg;
