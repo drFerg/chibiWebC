@@ -1,5 +1,5 @@
 #! /bin/bash
-
+CYAN='\033[0;36m'
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 GREY='\033[1;30m'
@@ -19,7 +19,7 @@ testRoute() {
 	body=""
 	response_data=""
 
-	echo -en ">> test ${GREY}$1 ${NC}($2, $3) > "
+	echo -en ">> test ${CYAN}$1 ${NC}($2, $3) > "
 	
 	response_data=$(curl "${curlArgs[@]}" http://localhost:5000$3)
 	response=(${response_data[@]}) # convert to array
