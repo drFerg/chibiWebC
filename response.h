@@ -12,7 +12,7 @@ typedef struct response {
   char *msg;
   int hdrLen;
   int len;
-  int file;
+  int isFile;
   int fileLen;
   int fd;
 } Response;

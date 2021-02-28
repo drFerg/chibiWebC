@@ -200,7 +200,7 @@ void *workerThread(void *workQueue) {
 
     /* Write response back to client */
     write(*clientfd, resp->msg, resp->len);
-    if (resp->file) transferFile(*clientfd, resp->fd);
+    if (resp->isFile) transferFile(*clientfd, resp->fd);
     
     close(*clientfd);
     request_free(req);

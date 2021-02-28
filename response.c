@@ -46,7 +46,7 @@ Response *response_new_file(int status, char* filePath) {
   Response *resp = (Response *) malloc(sizeof (Response));
   if (resp == NULL) return NULL;
 
-  resp->file = 1;
+  resp->isFile = 1;
   resp->hdrLen = generateResponse(resp->header, RESPONSE_HDR_SIZE, status, stbuf.st_size, 1);
   resp->len = resp->hdrLen;
   resp->msg = resp->header;
@@ -59,7 +59,7 @@ Response *response_new(int status, char *text, int len) {
   Response *resp = (Response *) malloc(sizeof (Response));
   if (resp == NULL) return NULL;
   
-  resp->file = 0;
+  resp->isFile = 0;
   resp->hdrLen = generateResponse(resp->header, RESPONSE_HDR_SIZE, status, len, 0);
   resp->len = resp->hdrLen + len + 1;
   
@@ -77,6 +77,6 @@ Response *response_new(int status, char *text, int len) {
 }
 
 void response_free(Response *resp) {
-  if (!resp->file) free(resp->msg);
+  if (!resp->isFile) free(resp->msg);
   free(resp);
 }
