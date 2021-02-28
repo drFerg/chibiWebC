@@ -2,6 +2,11 @@
 #define REQUEST_H
 
 #include "chibiWebDefs.h"
+#include "tsQueue.h"
+
+#define REQUEST_NULL 0
+#define REQUEST_GET  1
+#define REQUEST_POST 2
 
 typedef struct param {
   char *key;
@@ -11,12 +16,15 @@ typedef struct param {
 
 typedef struct request {
     char *buf;
-    char *type;
+    int type;
+    char *version;
     char *path;
     char *root;
     char *file;
     char *paramStr;
     Param *param;
+    TSQueue *headers;
+    char *body;
 } Request;
 /* parse a char request and return a new filled request */
 Request *request_parse(char *request);
