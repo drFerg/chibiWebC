@@ -12,6 +12,9 @@ adts:
 server: $(OBJ)
 	$(CC) $(CFLAGS) $(OBJ) $(LDFLAGS) -o chibiServer
 
+check: all
+	./chibiTest.sh
+
 clean:
 	rm *.o chibiServer
 

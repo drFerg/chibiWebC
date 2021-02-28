@@ -15,5 +15,7 @@ jobs:
     - uses: actions/checkout@v2
     - name: make
       run: make
-    - name: test ADTs
+    - name: run ADT tests
       run: dataStructures/tsqTest
+    - name: run chibiTest
+      run: make check
